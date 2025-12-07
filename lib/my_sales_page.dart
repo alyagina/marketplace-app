@@ -7,6 +7,77 @@ import '../models/order_model.dart';
 import '../models/product_model.dart';
 import 'order_detail_page.dart';
 
+Widget statusBadge(String s) {
+  final status = s.toLowerCase().trim();
+
+  late Color bg, textColor;
+  late String label;
+
+  switch (status) {
+    case 'pending':
+      label = 'Menunggu';
+      bg = Colors.orange.shade100;
+      textColor = Colors.orange.shade800;
+      break;
+
+    case 'dikirim':
+      label = 'Dikirim';
+      bg = Colors.blue.shade100;
+      textColor = Colors.blue.shade800;
+      break;
+
+    case 'success':
+      label = 'Selesai';
+      bg = Colors.green.shade100;
+      textColor = Colors.green.shade800;
+      break;
+
+    case 'cancelled':
+      label = 'Dibatalkan';
+      bg = Colors.red.shade100;
+      textColor = Colors.red.shade800;
+      break;
+
+    default:
+      label = s;
+      bg = Colors.grey.shade200;
+      textColor = Colors.grey.shade600;
+  }
+
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+    decoration: BoxDecoration(
+      color: bg,
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Text(
+      label,
+      style: TextStyle(
+        color: textColor,
+        fontWeight: FontWeight.w600,
+        fontSize: 12,
+      ),
+    ),
+  );
+}
+
+Widget smallButton({
+  required String label,
+  required VoidCallback onPressed,
+  Color color = Colors.blue,
+}) {
+  return ElevatedButton(
+    style: ElevatedButton.styleFrom(
+      backgroundColor: color,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+    ),
+    onPressed: onPressed,
+    child: Text(label),
+  );
+}
+
 class MySalesPage extends StatefulWidget {
   const MySalesPage({super.key});
 
@@ -95,6 +166,29 @@ class _MySalesPageState extends State<MySalesPage> {
     }
   }
 
+  Future<void> _markOrderAsShipped(int orderId) async {
+    final url = Uri.parse('http://mortava.biz.id/api/orders/$orderId/ship');
+
+    final response = await http.patch(
+      url,
+      headers: {'Accept': 'application/json'},
+    );
+
+    if (response.statusCode == 200) {
+      setState(() {
+        _futureSales = _fetchSales();
+      });
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Pesanan ditandai dikirim')));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal mengirim pesanan: ${response.body}')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -144,31 +238,27 @@ class _MySalesPageState extends State<MySalesPage> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // ====================
-                              // buyer username (baru)
-                              // ====================
+                              // Username Pembeli
                               if (o.buyerUsername != null &&
                                   o.buyerUsername!.isNotEmpty)
                                 Text(
                                   'Pembeli: ${o.buyerUsername!}',
                                   style: const TextStyle(
                                     fontWeight: FontWeight.w600,
-                                    fontSize: 13,
+                                    fontSize: 14,
                                   ),
                                 ),
 
                               const SizedBox(height: 8),
 
-                              // ====================
-                              // Info produk terjual
-                              // ====================
+                              // Produk Thumbnail + Info
                               FutureBuilder<Product>(
                                 future: _getProduct(o.productId),
                                 builder: (context, snap) {
                                   if (snap.connectionState ==
                                       ConnectionState.waiting) {
                                     return const Text(
-                                      'Memuat info produk...',
+                                      "Memuat info produk...",
                                       style: TextStyle(
                                         fontSize: 12,
                                         fontStyle: FontStyle.italic,
@@ -178,35 +268,31 @@ class _MySalesPageState extends State<MySalesPage> {
 
                                   if (snap.hasError || !snap.hasData) {
                                     return Text(
-                                      'Produk #${o.productId}',
+                                      "Produk #${o.productId}",
                                       style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
                                         fontSize: 16,
+                                        fontWeight: FontWeight.bold,
                                       ),
                                     );
                                   }
 
                                   final p = snap.data!;
+
                                   return Row(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
                                       ClipRRect(
-                                        borderRadius: BorderRadius.circular(8),
+                                        borderRadius: BorderRadius.circular(10),
                                         child: SizedBox(
-                                          width: 60,
-                                          height: 60,
+                                          width: 65,
+                                          height: 65,
                                           child:
-                                              (p.image != null &&
-                                                  p.image!.isNotEmpty)
+                                              p.image != null &&
+                                                  p.image!.isNotEmpty
                                               ? Image.network(
                                                   p.image!,
                                                   fit: BoxFit.cover,
-                                                  errorBuilder: (_, __, ___) =>
-                                                      const Icon(
-                                                        Icons
-                                                            .image_not_supported,
-                                                      ),
                                                 )
                                               : const Icon(
                                                   Icons.image,
@@ -214,7 +300,7 @@ class _MySalesPageState extends State<MySalesPage> {
                                                 ),
                                         ),
                                       ),
-                                      const SizedBox(width: 10),
+                                      const SizedBox(width: 12),
                                       Expanded(
                                         child: Column(
                                           crossAxisAlignment:
@@ -230,10 +316,15 @@ class _MySalesPageState extends State<MySalesPage> {
                                               ),
                                             ),
                                             const SizedBox(height: 4),
-                                            if (p.offerPrice != null)
-                                              Text('Rp ${p.offerPrice}')
-                                            else if (p.price != null)
-                                              Text('Rp ${p.price}'),
+                                            Text(
+                                              p.offerPrice != null
+                                                  ? "Rp ${p.offerPrice}"
+                                                  : "Rp ${p.price}",
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 14,
+                                              ),
+                                            ),
                                           ],
                                         ),
                                       ),
@@ -242,26 +333,51 @@ class _MySalesPageState extends State<MySalesPage> {
                                 },
                               ),
 
-                              const SizedBox(height: 12),
+                              const SizedBox(height: 16),
 
-                              // ====================
-                              // Info order
-                              // ====================
-                              Text(
-                                'Order #${o.id}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
+                              // Order info header + status badge
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    "Order #${o.id}",
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                  statusBadge(o.status),
+                                ],
                               ),
-                              const SizedBox(height: 4),
+
+                              const SizedBox(height: 8),
+
                               if (o.totalPrice != null)
                                 Text('Total: Rp ${o.totalPrice}'),
                               Text('Metode: ${o.paymentMethod.toUpperCase()}'),
-                              Text('Status: ${o.status}'),
+
+                              const SizedBox(height: 10),
+
+                              // Tombol "Pesanan dikirim" untuk penjual
+                              if (o.status.toLowerCase() == 'pending')
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: smallButton(
+                                    label: "Pesanan dikirim",
+                                    color: Colors.blue,
+                                    onPressed: () => _markOrderAsShipped(o.id),
+                                  ),
+                                ),
+
+                              const SizedBox(height: 8),
+
                               const Align(
                                 alignment: Alignment.centerRight,
-                                child: Icon(Icons.chevron_right),
+                                child: Icon(
+                                  Icons.chevron_right,
+                                  color: Colors.grey,
+                                ),
                               ),
                             ],
                           ),
