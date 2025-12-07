@@ -95,6 +95,80 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
     }
   }
 
+  // BARU DI UPDATE
+
+  Future<void> _cancelOrder(int orderId) async {
+    final url = Uri.parse('http://mortava.biz.id/api/orders/$orderId/cancel');
+
+    try {
+      final response = await http.patch(
+        url,
+        headers: {'Accept': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        // refresh pesanan
+        setState(() {
+          _futureOrders = _fetchOrders();
+        });
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Pesanan berhasil dibatalkan')),
+        );
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal membatalkan pesanan (${response.statusCode})'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+
+  Future<void> _markOrderAsCompleted(int orderId) async {
+    final url = Uri.parse('http://mortava.biz.id/api/orders/$orderId/complete');
+
+    try {
+      final response = await http.patch(
+        url,
+        headers: {'Accept': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        // reload daftar pesanan
+        setState(() {
+          _futureOrders = _fetchOrders();
+        });
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Pesanan ditandai selesai')),
+        );
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Gagal menyelesaikan pesanan (${response.statusCode})',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -288,6 +362,37 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
                                 Text("Telp: ${o.shippingPhone}")
                               else
                                 const Text("Telp: -"),
+
+                              const SizedBox(height: 8),
+
+                              // BARU UPDATE
+
+                              // Tombol Batalkan Pesanan (hanya jika status pending)
+                              if (o.status.toLowerCase() == 'pending')
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: TextButton(
+                                    onPressed: () => _cancelOrder(o.id),
+                                    child: const Text(
+                                      'Batalkan Pesanan',
+                                      style: TextStyle(color: Colors.red),
+                                    ),
+                                  ),
+                                ),
+
+                              // =====================
+                              // Tombol "Pesanan selesai"
+                              // =====================
+                              if (o.status.toLowerCase() != 'selesai' &&
+                                  o.status.toLowerCase() != 'cancelled')
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: ElevatedButton(
+                                    onPressed: () =>
+                                        _markOrderAsCompleted(o.id),
+                                    child: const Text('Pesanan selesai'),
+                                  ),
+                                ),
 
                               const Align(
                                 alignment: Alignment.centerRight,
